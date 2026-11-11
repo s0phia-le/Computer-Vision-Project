@@ -69,6 +69,16 @@ def main(
         # any functions available in open3d for background subtraction, road surface detection,
         # clustering, etc.
 
+        # TODO: voxel downsampling
+
+        # ground removal (RANSAC)
+
+        # background subtraction
+
+        # clustering (DBSCAN + centroid calculation)
+
+        # motion estimation
+
         # Write list of vehicles as a CSV
         write_csv_helper(output_path / f"{frame_number}.csv", vehicles)
 
