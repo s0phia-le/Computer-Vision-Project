@@ -76,6 +76,9 @@ def main(
         # clustering, etc.
 
         # TODO: voxel downsampling
+        pcd = load_point_cloud(data_path / f"{frame_number}.pcd")
+
+        pcd = preprocess_point_cloud(pcd, voxel_size=0.10)
 
         # ground removal (RANSAC)
 
