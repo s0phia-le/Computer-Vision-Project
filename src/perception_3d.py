@@ -46,7 +46,7 @@ def write_csv_helper(file: Path, vehicles: Iterable[Vehicle]):
 def load_point_cloud(path_to_cloud: Path) -> o3d.geometry.PointCloud:
     return o3d.io.read_point_cloud(path_to_cloud)
 
-# Preprocessing data
+# preprocessing point cloud data
 def preprocess_point_cloud(pcd: o3d.geometry.PointCloud, voxel_size: float = 0.10) -> o3d.geometry.PointCloud:
     """preprocess the point cloud by downsampling and removing outliers."""
     pcd = pcd.remove_non_finite_points(remove_nan=True, remove_infinite=True)
