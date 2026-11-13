@@ -53,6 +53,25 @@ def preprocess_point_cloud(pcd: o3d.geometry.PointCloud, voxel_size: float = 0.1
     pcd = pcd.voxel_down_sample(voxel_size)
     return pcd
 
+def ground_removal(pcd: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
+    """segment point cloud to remove plane"""
+
+    # finds plane with largest support in the point cloud
+    plane_model, inliers = pcd.segment_plane(distance_threshold=0.4,
+                                         ransac_n=3,
+                                         num_iterations=1000)
+    
+    # select all points excluding inliers (the ground)
+    return pcd.select_by_index(inliers, invert=True)
+
+def visualize_cloud(pcd: o3d.geometry.PointCloud):
+    """visualizes a given point cloud"""
+    o3d.visualization.draw_geometries([pcd],
+                                        zoom=0.8,
+                                        front=[-0.4999, -0.1659, -0.8499],
+                                        lookat=[2.1813, 2.0619, 2.0999],
+                                        up=[0.1204, -0.9852, 0.1215])
+
 def main(
     data_path: Path,
     output_path: Path = "perception_results",
@@ -75,12 +94,12 @@ def main(
         # any functions available in open3d for background subtraction, road surface detection,
         # clustering, etc.
 
-        # TODO: voxel downsampling
         pcd = load_point_cloud(data_path / f"{frame_number}.pcd")
 
         pcd = preprocess_point_cloud(pcd, voxel_size=0.10)
 
         # ground removal (RANSAC)
+        pcd = ground_removal(pcd)
 
         # background subtraction
 
