@@ -3,6 +3,8 @@ from pathlib import Path
 from typing import Iterable
 
 import open3d as o3d
+import matplotlib.pyplot as plt
+import numpy as np
 from tqdm.auto import trange
 
 
@@ -83,8 +85,24 @@ def visualize_cloud(pcd: o3d.geometry.PointCloud):
                                         lookat=[2.1813, 2.0619, 2.0999],
                                         up=[0.1204, -0.9852, 0.1215])
 
-def clustering(pcd: o3d.geometry.PointCloud):
-    # TODO: dbscan clustering
+def clustering(pcd: o3d.geometry.PointCloud, eps, min_points):
+    """cluster the point cloud using DBSCAN"""
+    
+    # run the DBSCAN clustering
+    with o3d.utility.VerbosityContextManager(
+    o3d.utility.VerbosityLevel.Debug
+    ) as cm:
+        labels = np.array(pcd.cluster_dbscan(eps=0.02, min_points=10))
+
+    # 3. Analyze clusters
+    max_label = labels.max()
+    print(f"Point cloud has {max_label + 1} clusters (excluding noise)")
+    
+    # visualize clusies 
+    colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
+    colors[labels < 0] = 0  # Black/zero for noise
+    pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
+    o3d.visualization.draw_geometries([pcd])
 
     return preprocess_point_cloud
 
