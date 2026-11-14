@@ -104,8 +104,6 @@ def clustering(pcd: o3d.geometry.PointCloud, eps, min_points):
     pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
     o3d.visualization.draw_geometries([pcd])
 
-    return preprocess_point_cloud
-
 def main(
     data_path: Path,
     output_path: Path = "perception_results",
@@ -138,6 +136,7 @@ def main(
         # background subtraction
 
         # clustering (DBSCAN + centroid calculation)
+        clustering(pcd, eps=0.2, min_points=4)
 
         # motion estimation
 
