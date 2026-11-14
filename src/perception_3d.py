@@ -83,6 +83,11 @@ def visualize_cloud(pcd: o3d.geometry.PointCloud):
                                         lookat=[2.1813, 2.0619, 2.0999],
                                         up=[0.1204, -0.9852, 0.1215])
 
+def clustering(pcd: o3d.geometry.PointCloud):
+    # TODO: dbscan clustering
+
+    return preprocess_point_cloud
+
 def main(
     data_path: Path,
     output_path: Path = "perception_results",
