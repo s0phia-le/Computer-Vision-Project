@@ -60,6 +60,17 @@ def ground_removal(pcd: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
     plane_model, inliers = pcd.segment_plane(distance_threshold=0.4,
                                          ransac_n=3,
                                          num_iterations=1000)
+
+    inlier_cloud = pcd.select_by_index(inliers)
+    outlier_cloud = pcd.select_by_index(inliers, invert=True)
+    inlier_cloud.paint_uniform_color([1.0, 0, 0])
+    o3d.visualization.draw_geometries(
+        [inlier_cloud, outlier_cloud],
+        zoom=0.8,
+        front=[-0.4999, -0.1659, -0.8499],
+        lookat=[2.1813, 2.0619, 2.0999],
+        up=[0.1204, -0.9852, 0.1215]
+    )
     
     # select all points excluding inliers (the ground)
     return pcd.select_by_index(inliers, invert=True)
