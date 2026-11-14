@@ -92,7 +92,7 @@ def clustering(pcd: o3d.geometry.PointCloud, eps, min_points):
     with o3d.utility.VerbosityContextManager(
     o3d.utility.VerbosityLevel.Debug
     ) as cm:
-        labels = np.array(pcd.cluster_dbscan(eps=0.02, min_points=10))
+        labels = np.array(pcd.cluster_dbscan(eps, min_points, print_progress=True))
 
     # 3. Analyze clusters
     max_label = labels.max()
@@ -136,7 +136,7 @@ def main(
         # background subtraction
 
         # clustering (DBSCAN + centroid calculation)
-        clustering(pcd, eps=0.2, min_points=4)
+        clustering(pcd, eps=1, min_points=4)
 
         # motion estimation
 
