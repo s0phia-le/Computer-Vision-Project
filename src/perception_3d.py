@@ -83,7 +83,7 @@ def background_subtraction(base_pcd: o3d.geometry.PointCloud, pcd: o3d.geometry.
     stationary objects.
     """
 
-    dists = base_pcd.compute_point_cloud_distance(pcd)
+    dists = pcd.compute_point_cloud_distance(base_pcd)
     dists = np.asarray(dists)
 
     # use a distance threshold to create and use a mask of non-static point clouds
