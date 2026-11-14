@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Iterable
 
 import open3d as o3d
+import numpy as np
 from tqdm.auto import trange
 
 
@@ -75,6 +76,33 @@ def ground_removal(pcd: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
     # select all points excluding inliers (the ground)
     return pcd.select_by_index(inliers, invert=True)
 
+
+def background_subtraction(base_pcd: o3d.geometry.PointCloud, pcd: o3d.geometry.PointCloud, dist_thresh: float) -> o3d.geometry.PointCloud:
+    """
+    Using a base point cloud, perform background subtraction on the current point cloud and remove
+    stationary objects.
+    """
+
+    dists = base_pcd.compute_point_cloud_distance(pcd)
+    dists = np.asarray(dists)
+
+    # use a distance threshold to create and use a mask of non-static point clouds
+    non_static_idxs = np.where(dists > dist_thresh)[0]
+    non_static_pcd = pcd.select_by_index(non_static_idxs)
+    static_pcd = pcd.select_by_index(non_static_idxs, invert=True)
+    static_pcd.paint_uniform_color([1.0, 0, 0])
+
+    o3d.visualization.draw_geometries(
+        [non_static_pcd, static_pcd],
+        zoom=0.8,
+        front=[-0.4999, -0.1659, -0.8499],
+        lookat=[2.1813, 2.0619, 2.0999],
+        up=[0.1204, -0.9852, 0.1215]
+    )
+
+    return non_static_pcd
+
+
 def visualize_cloud(pcd: o3d.geometry.PointCloud):
     """visualizes a given point cloud"""
     o3d.visualization.draw_geometries([pcd],
@@ -95,6 +123,7 @@ def main(
         end_index = len(list(data_path.glob("*.pcd"))) + end_index
 
     # Load each point cloud and display it
+    base_pcd = None
     for frame_number in trange(start_index, end_index + 1, desc="Processing Frames"):
         vehicles: list[Vehicle] = []
 
@@ -113,6 +142,10 @@ def main(
         pcd = ground_removal(pcd)
 
         # background subtraction
+        if base_pcd is None:
+            base_pcd = pcd
+        else:
+            pcd = background_subtraction(base_pcd, pcd, 0.00001)
 
         # clustering (DBSCAN + centroid calculation)
 
