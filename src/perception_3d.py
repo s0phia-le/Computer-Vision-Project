@@ -5,6 +5,7 @@ from typing import Iterable
 import open3d as o3d
 import numpy as np
 from tqdm.auto import trange
+from collections import deque
 
 
 @dataclass
@@ -110,6 +111,7 @@ def background_subtraction(base_pcd: o3d.geometry.PointCloud, pcd: o3d.geometry.
     non_static_idxs = np.where(dists > dist_thresh)[0]
     non_static_pcd = pcd.select_by_index(non_static_idxs)
     static_pcd = pcd.select_by_index(non_static_idxs, invert=True)
+    non_static_pcd.paint_uniform_color([0, 0, 1.0])
     static_pcd.paint_uniform_color([1.0, 0, 0])
 
     o3d.visualization.draw_geometries(
@@ -143,7 +145,7 @@ def main(
         end_index = len(list(data_path.glob("*.pcd"))) + end_index
 
     # Load each point cloud and display it
-    base_pcd = None
+    queue = deque()
     for frame_number in trange(start_index, end_index + 1, desc="Processing Frames"):
         vehicles: list[Vehicle] = []
 
@@ -165,10 +167,12 @@ def main(
         pcd = remove_high_points(pcd)
 
         # background subtraction
-        if base_pcd is None:
-            base_pcd = pcd
+        if frame_number < 10:
+            queue.append(pcd)
         else:
-            pcd = background_subtraction(base_pcd, pcd, 0.00005)
+            queue.append(pcd)
+            base_pcd = queue.popleft()
+            pcd = background_subtraction(base_pcd, pcd, 0.003)
 
         # clustering (DBSCAN + centroid calculation)
 
