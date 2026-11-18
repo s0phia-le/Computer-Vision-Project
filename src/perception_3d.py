@@ -65,16 +65,36 @@ def ground_removal(pcd: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
     inlier_cloud = pcd.select_by_index(inliers)
     outlier_cloud = pcd.select_by_index(inliers, invert=True)
     inlier_cloud.paint_uniform_color([1.0, 0, 0])
-    o3d.visualization.draw_geometries(
-        [inlier_cloud, outlier_cloud],
-        zoom=0.8,
-        front=[-0.4999, -0.1659, -0.8499],
-        lookat=[2.1813, 2.0619, 2.0999],
-        up=[0.1204, -0.9852, 0.1215]
-    )
+    # o3d.visualization.draw_geometries(
+    #     [inlier_cloud, outlier_cloud],
+    #     zoom=0.8,
+    #     front=[-0.4999, -0.1659, -0.8499],
+    #     lookat=[2.1813, 2.0619, 2.0999],
+    #     up=[0.1204, -0.9852, 0.1215]
+    # )
     
     # select all points excluding inliers (the ground)
     return pcd.select_by_index(inliers, invert=True)
+
+
+def remove_high_points(pcd: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
+    points = np.asarray(pcd.points)
+    max_height = 2.3
+    high_indices = np.where(points[:, 2] > max_height)[0]
+    
+    low_pcd = pcd.select_by_index(high_indices, invert=True)
+
+    # high_pcd = pcd.select_by_index(high_indices)
+    # high_pcd.paint_uniform_color([1.0, 0, 0])
+    # o3d.visualization.draw_geometries(
+    #     [high_pcd, low_pcd],
+    #     zoom=0.8,
+    #     front=[-0.4999, -0.1659, -0.8499],
+    #     lookat=[2.1813, 2.0619, 2.0999],
+    #     up=[0.1204, -0.9852, 0.1215]
+    # )
+
+    return low_pcd
 
 
 def background_subtraction(base_pcd: o3d.geometry.PointCloud, pcd: o3d.geometry.PointCloud, dist_thresh: float) -> o3d.geometry.PointCloud:
@@ -141,11 +161,14 @@ def main(
         # ground removal (RANSAC)
         pcd = ground_removal(pcd)
 
+        # remove high points (above cars)
+        pcd = remove_high_points(pcd)
+
         # background subtraction
         if base_pcd is None:
             base_pcd = pcd
         else:
-            pcd = background_subtraction(base_pcd, pcd, 0.00001)
+            pcd = background_subtraction(base_pcd, pcd, 0.00005)
 
         # clustering (DBSCAN + centroid calculation)
 
