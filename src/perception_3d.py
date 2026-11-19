@@ -172,9 +172,9 @@ def estimate_motion(curr_vehicles: list[Vehicle], prev_vehicles: list[Vehicle], 
 
         # assign ID and calculate velocity
         curr.vehicle_id = prev.vehicle_id
-        curr.mvec_x = (curr.position_x - prev.position_x) / frame_dt
-        curr.mvec_y = (curr.position_y - prev.position_y) / frame_dt
-        curr.mvec_z = (curr.position_z - prev.position_z) / frame_dt
+        curr.mvec_x = curr.position_x - prev.position_x 
+        curr.mvec_y = curr.position_y - prev.position_y
+        curr.mvec_z = curr.position_z - prev.position_z
 
         matched_curr.add(curr_idx)
         matched_prev.add(prev_idx)
@@ -291,29 +291,29 @@ def main(
         pcd = remove_high_points(pcd)
 
         # background subtraction
-        dist_thresh = 0.001
-        
-        if frame_number == 0:
+        dist_threshold = 0.003
+        if frame_number <= 2:
             queue.append(pcd)
-        if frame_number < 10:
+        elif frame_number < 10:
             queue.append(pcd)
             base_pcd = queue[0]
-            pcd = background_subtraction(base_pcd, pcd, dist_thresh)
+            pcd = background_subtraction(base_pcd, pcd, dist_threshold)
         else:
             queue.append(pcd)
             base_pcd = queue.popleft()
-            pcd = background_subtraction(base_pcd, pcd, dist_thresh)
+            pcd = background_subtraction(base_pcd, pcd, dist_threshold)
 
-        # clustering (DBSCAN + centroid calculation)
-        clustering(pcd, vehicles, eps=2, min_points=5)
+        if frame_number > 2:
+            # clustering (DBSCAN + centroid calculation)
+            clustering(pcd, vehicles, eps=2, min_points=5)
 
-        # motion estimation
-        next_vehicle_id = estimate_motion(vehicles, previous_vehicles, next_vehicle_id, max_match_distance=2.0, frame_dt=1.0)
+            # motion estimation
+            next_vehicle_id = estimate_motion(vehicles, previous_vehicles, next_vehicle_id, max_match_distance=2.0, frame_dt=1.0)
 
-        # Write list of vehicles as a CSV
-        write_csv_helper(output_path / f"{frame_number}.csv", vehicles)
+            # Write list of vehicles as a CSV
+            write_csv_helper(output_path / f"{frame_number}.csv", vehicles)
 
-        previous_vehicles = vehicles
+            previous_vehicles = vehicles
 
 
 if __name__ == "__main__":

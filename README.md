@@ -29,3 +29,16 @@ ideas
  - keep remaining points of building
  - use the frames 10 seconds ago rather than 1st frame 
  - use frames that are slightly further away so they aren't captured by distance threshold easily
+
+
+- eps not good enough
+- back sub: doesn't work for first 2-3 bc using 1st frame as reference
+- perhaps throw away the first frame
+- back sub might remove points from cars
+- distance threshold needs tweaked: threshold above, if dist < threshold, static. if dist >, keep bc nonstatic
+- RANSAC detects ground sometimes
+- clustering is categorizing ground as noise
+- if points far enough away from each other, should be fine
+- consider what is considered a cluster because one moving car is being clustered as noise
+- check DBSCAN and ground removal.
+- **populate csv file with motion_vec**
