@@ -40,4 +40,5 @@ ideas
 - clustering is categorizing ground as noise
 - if points far enough away from each other, should be fine
 - consider what is considered a cluster because one moving car is being clustered as noise
-- check DBSCAN and ground removal. 
+- check DBSCAN and ground removal.
+- **populate csv file with motion_vec**
