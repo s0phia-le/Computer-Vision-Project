@@ -6,6 +6,7 @@ import open3d as o3d
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm.auto import trange
+from collections import deque
 
 
 @dataclass
@@ -66,16 +67,64 @@ def ground_removal(pcd: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
     inlier_cloud = pcd.select_by_index(inliers)
     outlier_cloud = pcd.select_by_index(inliers, invert=True)
     inlier_cloud.paint_uniform_color([1.0, 0, 0])
+    # o3d.visualization.draw_geometries(
+    #     [inlier_cloud, outlier_cloud],
+    #     zoom=0.8,
+    #     front=[-0.4999, -0.1659, -0.8499],
+    #     lookat=[2.1813, 2.0619, 2.0999],
+    #     up=[0.1204, -0.9852, 0.1215]
+    # )
+    
+    # select all points excluding inliers (the ground)
+    return pcd.select_by_index(inliers, invert=True)
+
+
+def remove_high_points(pcd: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
+    points = np.asarray(pcd.points)
+    max_height = 2.3
+    high_indices = np.where(points[:, 2] > max_height)[0]
+    
+    low_pcd = pcd.select_by_index(high_indices, invert=True)
+
+    # high_pcd = pcd.select_by_index(high_indices)
+    # high_pcd.paint_uniform_color([1.0, 0, 0])
+    # o3d.visualization.draw_geometries(
+    #     [high_pcd, low_pcd],
+    #     zoom=0.8,
+    #     front=[-0.4999, -0.1659, -0.8499],
+    #     lookat=[2.1813, 2.0619, 2.0999],
+    #     up=[0.1204, -0.9852, 0.1215]
+    # )
+
+    return low_pcd
+
+
+def background_subtraction(base_pcd: o3d.geometry.PointCloud, pcd: o3d.geometry.PointCloud, dist_thresh: float) -> o3d.geometry.PointCloud:
+    """
+    Using a base point cloud, perform background subtraction on the current point cloud and remove
+    stationary objects.
+    """
+
+    dists = pcd.compute_point_cloud_distance(base_pcd)
+    dists = np.asarray(dists)
+
+    # use a distance threshold to create and use a mask of non-static point clouds
+    non_static_idxs = np.where(dists > dist_thresh)[0]
+    non_static_pcd = pcd.select_by_index(non_static_idxs)
+    static_pcd = pcd.select_by_index(non_static_idxs, invert=True)
+    non_static_pcd.paint_uniform_color([0, 0, 1.0])
+    static_pcd.paint_uniform_color([1.0, 0, 0])
+
     o3d.visualization.draw_geometries(
-        [inlier_cloud, outlier_cloud],
+        [non_static_pcd, static_pcd],
         zoom=0.8,
         front=[-0.4999, -0.1659, -0.8499],
         lookat=[2.1813, 2.0619, 2.0999],
         up=[0.1204, -0.9852, 0.1215]
     )
-    
-    # select all points excluding inliers (the ground)
-    return pcd.select_by_index(inliers, invert=True)
+
+    return non_static_pcd
+
 
 def visualize_cloud(pcd: o3d.geometry.PointCloud):
     """visualizes a given point cloud"""
@@ -116,6 +165,7 @@ def main(
         end_index = len(list(data_path.glob("*.pcd"))) + end_index
 
     # Load each point cloud and display it
+    queue = deque()
     for frame_number in trange(start_index, end_index + 1, desc="Processing Frames"):
         vehicles: list[Vehicle] = []
 
@@ -133,7 +183,16 @@ def main(
         # ground removal (RANSAC)
         pcd = ground_removal(pcd)
 
+        # remove high points (above cars)
+        pcd = remove_high_points(pcd)
+
         # background subtraction
+        if frame_number < 10:
+            queue.append(pcd)
+        else:
+            queue.append(pcd)
+            base_pcd = queue.popleft()
+            pcd = background_subtraction(base_pcd, pcd, 0.003)
 
         # clustering (DBSCAN + centroid calculation)
         clustering(pcd, eps=1.5, min_points=6)
