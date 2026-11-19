@@ -172,9 +172,9 @@ def estimate_motion(curr_vehicles: list[Vehicle], prev_vehicles: list[Vehicle], 
 
         # assign ID and calculate velocity
         curr.vehicle_id = prev.vehicle_id
-        curr.mvec_x = (curr.position_x - prev.position_x) / frame_dt
-        curr.mvec_y = (curr.position_y - prev.position_y) / frame_dt
-        curr.mvec_z = (curr.position_z - prev.position_z) / frame_dt
+        curr.mvec_x = curr.position_x - prev.position_x 
+        curr.mvec_y = curr.position_y - prev.position_y
+        curr.mvec_z = curr.position_z - prev.position_z
 
         matched_curr.add(curr_idx)
         matched_prev.add(prev_idx)
@@ -200,15 +200,14 @@ def clustering(pcd: o3d.geometry.PointCloud, eps, min_points):
         labels = np.array(pcd.cluster_dbscan(eps, min_points, print_progress=True))
 
     # 3. Analyze clusters
-    if len(labels) != 0:
-        max_label = labels.max()
-        print(f"Point cloud has {max_label + 1} clusters (excluding noise)")
-        
-        # visualize clusies 
-        colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
-        colors[labels < 0] = 0  # Black/zero for noise
-        pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
-        o3d.visualization.draw_geometries([pcd])
+    max_label = labels.max()
+    print(f"Point cloud has {max_label + 1} clusters (excluding noise)")
+    
+    # visualize clusies 
+    colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
+    colors[labels < 0] = 0  # Black/zero for noise
+    pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
+    o3d.visualization.draw_geometries([pcd])
 
 def main(
     data_path: Path,
@@ -247,12 +246,8 @@ def main(
         pcd = remove_high_points(pcd)
 
         # background subtraction
-        if frame_number == 0:
-            queue.append(pcd)
         if frame_number < 10:
             queue.append(pcd)
-            base_pcd = queue[0]
-            pcd = background_subtraction(base_pcd, pcd, 0.003)
         else:
             queue.append(pcd)
             base_pcd = queue.popleft()
