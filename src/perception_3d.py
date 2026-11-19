@@ -136,7 +136,7 @@ def main(
         # background subtraction
 
         # clustering (DBSCAN + centroid calculation)
-        clustering(pcd, eps=1.5, min_points=4)
+        clustering(pcd, eps=1.5, min_points=6)
 
         # motion estimation
 
