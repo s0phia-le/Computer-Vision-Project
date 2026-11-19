@@ -6,6 +6,7 @@ import open3d as o3d
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm.auto import trange
+from collections import deque
 
 
 @dataclass
@@ -66,16 +67,64 @@ def ground_removal(pcd: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
     inlier_cloud = pcd.select_by_index(inliers)
     outlier_cloud = pcd.select_by_index(inliers, invert=True)
     inlier_cloud.paint_uniform_color([1.0, 0, 0])
+    # o3d.visualization.draw_geometries(
+    #     [inlier_cloud, outlier_cloud],
+    #     zoom=0.8,
+    #     front=[-0.4999, -0.1659, -0.8499],
+    #     lookat=[2.1813, 2.0619, 2.0999],
+    #     up=[0.1204, -0.9852, 0.1215]
+    # )
+    
+    # select all points excluding inliers (the ground)
+    return pcd.select_by_index(inliers, invert=True)
+
+
+def remove_high_points(pcd: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
+    points = np.asarray(pcd.points)
+    max_height = 2.3
+    high_indices = np.where(points[:, 2] > max_height)[0]
+    
+    low_pcd = pcd.select_by_index(high_indices, invert=True)
+
+    # high_pcd = pcd.select_by_index(high_indices)
+    # high_pcd.paint_uniform_color([1.0, 0, 0])
+    # o3d.visualization.draw_geometries(
+    #     [high_pcd, low_pcd],
+    #     zoom=0.8,
+    #     front=[-0.4999, -0.1659, -0.8499],
+    #     lookat=[2.1813, 2.0619, 2.0999],
+    #     up=[0.1204, -0.9852, 0.1215]
+    # )
+
+    return low_pcd
+
+
+def background_subtraction(base_pcd: o3d.geometry.PointCloud, pcd: o3d.geometry.PointCloud, dist_thresh: float) -> o3d.geometry.PointCloud:
+    """
+    Using a base point cloud, perform background subtraction on the current point cloud and remove
+    stationary objects.
+    """
+
+    dists = pcd.compute_point_cloud_distance(base_pcd)
+    dists = np.asarray(dists)
+
+    # use a distance threshold to create and use a mask of non-static point clouds
+    non_static_idxs = np.where(dists > dist_thresh)[0]
+    non_static_pcd = pcd.select_by_index(non_static_idxs)
+    static_pcd = pcd.select_by_index(non_static_idxs, invert=True)
+    non_static_pcd.paint_uniform_color([0, 0, 1.0])
+    static_pcd.paint_uniform_color([1.0, 0, 0])
+
     o3d.visualization.draw_geometries(
-        [inlier_cloud, outlier_cloud],
+        [non_static_pcd, static_pcd],
         zoom=0.8,
         front=[-0.4999, -0.1659, -0.8499],
         lookat=[2.1813, 2.0619, 2.0999],
         up=[0.1204, -0.9852, 0.1215]
     )
-    
-    # select all points excluding inliers (the ground)
-    return pcd.select_by_index(inliers, invert=True)
+
+    return non_static_pcd
+
 
 def visualize_cloud(pcd: o3d.geometry.PointCloud):
     """visualizes a given point cloud"""
@@ -84,6 +133,62 @@ def visualize_cloud(pcd: o3d.geometry.PointCloud):
                                         front=[-0.4999, -0.1659, -0.8499],
                                         lookat=[2.1813, 2.0619, 2.0999],
                                         up=[0.1204, -0.9852, 0.1215])
+
+def estimate_motion(curr_vehicles: list[Vehicle], prev_vehicles: list[Vehicle], next_vehicle_id: int, max_match_distance: float = 2.0, frame_dt: float = 1.0) -> int:
+    """Estimate motion of vehicles by matching current vehicles to previous vehicles based on proximity."""
+    # first frame: assign IDs but velocity unknown
+    if not prev_vehicles:
+        for v in curr_vehicles:
+            v.vehicle_id = next_vehicle_id
+            next_vehicle_id += 1
+
+        return next_vehicle_id
+
+    # calc dist between every current and previous vehicle
+    distances = []
+    for curr_idx, curr in enumerate(curr_vehicles):
+        for prev_idx, prev in enumerate(prev_vehicles):
+            dx = curr.position_x - prev.position_x
+            dy = curr.position_y - prev.position_y
+            dz = curr.position_z - prev.position_z
+
+            dist = np.sqrt(dx**2 + dy**2 + dz**2)
+            distances.append((dist, curr_idx, prev_idx))
+
+    # closest pairs
+    distances.sort(key=lambda x: x[0])
+    matched_curr = set()
+    matched_prev = set()
+
+    # match vehicle
+    for dist, curr_idx, prev_idx in distances:
+        if dist > max_match_distance:
+            break
+        if curr_idx in matched_curr or prev_idx in matched_prev:
+            continue
+
+        curr = curr_vehicles[curr_idx]
+        prev = prev_vehicles[prev_idx]
+
+        # assign ID and calculate velocity
+        curr.vehicle_id = prev.vehicle_id
+        curr.mvec_x = (curr.position_x - prev.position_x) / frame_dt
+        curr.mvec_y = (curr.position_y - prev.position_y) / frame_dt
+        curr.mvec_z = (curr.position_z - prev.position_z) / frame_dt
+
+        matched_curr.add(curr_idx)
+        matched_prev.add(prev_idx)
+
+        # assign ids to unmatched vehicles
+        for curr_idx, v in enumerate(curr_vehicles):
+            if curr_idx not in matched_curr:
+                v.vehicle_id = next_vehicle_id
+                next_vehicle_id += 1
+
+                v.mvec_x = 0.0
+                v.mvec_y = 0.0
+                v.mvec_z = 0.0
+    return next_vehicle_id
 
 def clustering(pcd: o3d.geometry.PointCloud, eps, min_points):
     """cluster the point cloud using DBSCAN"""
@@ -115,7 +220,11 @@ def main(
     if end_index < 0:
         end_index = len(list(data_path.glob("*.pcd"))) + end_index
 
+    previous_vehicles = []
+    next_vehicle_id = 0
+
     # Load each point cloud and display it
+    queue = deque()
     for frame_number in trange(start_index, end_index + 1, desc="Processing Frames"):
         vehicles: list[Vehicle] = []
 
@@ -133,15 +242,27 @@ def main(
         # ground removal (RANSAC)
         pcd = ground_removal(pcd)
 
+        # remove high points (above cars)
+        pcd = remove_high_points(pcd)
+
         # background subtraction
+        if frame_number < 10:
+            queue.append(pcd)
+        else:
+            queue.append(pcd)
+            base_pcd = queue.popleft()
+            pcd = background_subtraction(base_pcd, pcd, 0.003)
 
         # clustering (DBSCAN + centroid calculation)
         clustering(pcd, eps=1.5, min_points=6)
 
         # motion estimation
+        next_vehicle_id = estimate_motion(vehicles, previous_vehicles, next_vehicle_id, max_match_distance=2.0, frame_dt=1.0)
 
         # Write list of vehicles as a CSV
         write_csv_helper(output_path / f"{frame_number}.csv", vehicles)
+
+        previous_vehicles = vehicles
 
 
 if __name__ == "__main__":
