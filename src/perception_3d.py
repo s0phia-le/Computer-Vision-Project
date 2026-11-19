@@ -60,7 +60,7 @@ def ground_removal(pcd: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
     """segment point cloud to remove plane"""
 
     # finds plane with largest support in the point cloud
-    plane_model, inliers = pcd.segment_plane(distance_threshold=0.4,
+    plane_model, inliers = pcd.segment_plane(distance_threshold=0.5,
                                          ransac_n=3,
                                          num_iterations=1000)
 
@@ -198,17 +198,43 @@ def clustering(pcd: o3d.geometry.PointCloud, eps, min_points):
     o3d.utility.VerbosityLevel.Debug
     ) as cm:
         labels = np.array(pcd.cluster_dbscan(eps, min_points, print_progress=True))
+        
 
     # 3. Analyze clusters
     if len(labels) != 0:
         max_label = labels.max()
         print(f"Point cloud has {max_label + 1} clusters (excluding noise)")
         
-        # visualize clusies 
-        colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
-        colors[labels < 0] = 0  # Black/zero for noise
-        pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
-        o3d.visualization.draw_geometries([pcd])
+        bounding_boxes = []
+
+        for i in range(max_label + 1):
+            # Get indices of points belonging to cluster i
+            cluster_indices = np.where(labels == i)[0]
+            
+            # Extract the cluster as its own PointCloud
+            cluster_pcd = pcd.select_by_index(cluster_indices)
+            
+            # Get the Axis-Aligned Bounding Box (AABB)
+            aabb = cluster_pcd.get_axis_aligned_bounding_box()
+            aabb.color = (1, 0, 0)  # Optional: color box red for visualization
+            bounding_boxes.append(aabb)
+            
+            # Access raw min/max coordinate arrays if needed
+            min_bound = aabb.get_min_bound()
+            max_bound = aabb.get_max_bound()
+            print(f"Cluster {i} | Min: {min_bound} | Max: {max_bound}")
+
+        # 3. Visualize the point cloud along with all cluster bounding boxes
+        o3d.visualization.draw_geometries([pcd, *bounding_boxes])
+                    
+            
+        # # visualize clusies 
+        # colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
+        # colors[labels < 0] = 0  # Black/zero for noise
+        # pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
+        # o3d.visualization.draw_geometries([pcd])
+        
+   
 
 def main(
     data_path: Path,
@@ -247,19 +273,21 @@ def main(
         pcd = remove_high_points(pcd)
 
         # background subtraction
+        dist_thresh = 0.001
+        
         if frame_number == 0:
             queue.append(pcd)
         if frame_number < 10:
             queue.append(pcd)
             base_pcd = queue[0]
-            pcd = background_subtraction(base_pcd, pcd, 0.003)
+            pcd = background_subtraction(base_pcd, pcd, dist_thresh)
         else:
             queue.append(pcd)
             base_pcd = queue.popleft()
-            pcd = background_subtraction(base_pcd, pcd, 0.003)
+            pcd = background_subtraction(base_pcd, pcd, dist_thresh)
 
         # clustering (DBSCAN + centroid calculation)
-        clustering(pcd, eps=1.5, min_points=6)
+        clustering(pcd, eps=2, min_points=5)
 
         # motion estimation
         next_vehicle_id = estimate_motion(vehicles, previous_vehicles, next_vehicle_id, max_match_distance=2.0, frame_dt=1.0)
