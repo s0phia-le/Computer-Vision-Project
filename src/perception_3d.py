@@ -190,7 +190,7 @@ def estimate_motion(curr_vehicles: list[Vehicle], prev_vehicles: list[Vehicle], 
                 v.mvec_z = 0.0
     return next_vehicle_id
 
-def clustering(pcd: o3d.geometry.PointCloud, eps, min_points):
+def clustering(pcd: o3d.geometry.PointCloud, vehicles, eps, min_points):
     """cluster the point cloud using DBSCAN"""
     
     # run the DBSCAN clustering
@@ -200,7 +200,7 @@ def clustering(pcd: o3d.geometry.PointCloud, eps, min_points):
         labels = np.array(pcd.cluster_dbscan(eps, min_points, print_progress=True))
         
 
-    # 3. Analyze clusters
+    # Analyze clusters
     if len(labels) != 0:
         max_label = labels.max()
         print(f"Point cloud has {max_label + 1} clusters (excluding noise)")
@@ -208,33 +208,51 @@ def clustering(pcd: o3d.geometry.PointCloud, eps, min_points):
         bounding_boxes = []
 
         for i in range(max_label + 1):
-            # Get indices of points belonging to cluster i
+            # get indices of points belonging to cluster i
             cluster_indices = np.where(labels == i)[0]
-            
-            # Extract the cluster as its own PointCloud
+        
+            # extract the cluster as its own PointCloud
             cluster_pcd = pcd.select_by_index(cluster_indices)
             
-            # Get the Axis-Aligned Bounding Box (AABB)
+            # get centroid 
+            x, y, z = cluster_pcd.get_center()
+            
+            # print(f"Centroid center: x={x}, y={y}, z={z}")
+            
+            # get the Axis-Aligned Bounding Box (AABB)
             aabb = cluster_pcd.get_axis_aligned_bounding_box()
-            aabb.color = (1, 0, 0)  # Optional: color box red for visualization
+            aabb.color = (1, 0, 0) 
             bounding_boxes.append(aabb)
             
-            # Access raw min/max coordinate arrays if needed
+            # access raw min/max coordinate arrays if needed
             min_bound = aabb.get_min_bound()
             max_bound = aabb.get_max_bound()
-            print(f"Cluster {i} | Min: {min_bound} | Max: {max_bound}")
+            # print(f"Cluster {i} | Min: {min_bound} | Max: {max_bound}")
+            
+            # add the vehicle
+            vehicles.append(Vehicle(
+                vehicle_id=i,
+                position_x=x,
+                position_y=y,
+                position_z=z,
+                bbox_x_max= max_bound[0],
+                bbox_x_min= min_bound[0],
+                bbox_y_max= max_bound[1],
+                bbox_y_min= min_bound[1],
+                bbox_z_max= max_bound[2],
+                bbox_z_min= min_bound[2]
+                )
+            )
 
-        # 3. Visualize the point cloud along with all cluster bounding boxes
+        # visualize the point cloud along with all cluster bounding boxes
         o3d.visualization.draw_geometries([pcd, *bounding_boxes])
-                    
             
         # # visualize clusies 
         # colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
         # colors[labels < 0] = 0  # Black/zero for noise
         # pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
-        # o3d.visualization.draw_geometries([pcd])
+        # o3d.visualization.draw_geometries([pcd])          
         
-   
 
 def main(
     data_path: Path,
@@ -287,7 +305,7 @@ def main(
             pcd = background_subtraction(base_pcd, pcd, dist_thresh)
 
         # clustering (DBSCAN + centroid calculation)
-        clustering(pcd, eps=2, min_points=5)
+        clustering(pcd, vehicles, eps=2, min_points=5)
 
         # motion estimation
         next_vehicle_id = estimate_motion(vehicles, previous_vehicles, next_vehicle_id, max_match_distance=2.0, frame_dt=1.0)
