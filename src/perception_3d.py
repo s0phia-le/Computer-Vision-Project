@@ -250,7 +250,6 @@ def main(
         if frame_number <= 2:
             queue.append(pcd)
         elif frame_number < 10:
-            print("HERE:", frame_number)
             queue.append(pcd)
             base_pcd = queue[0]
             pcd = background_subtraction(base_pcd, pcd, dist_threshold)
@@ -260,7 +259,6 @@ def main(
             pcd = background_subtraction(base_pcd, pcd, dist_threshold)
 
         if frame_number > 2:
-            print("HERE2:", frame_number)
             # clustering (DBSCAN + centroid calculation)
             clustering(pcd, eps=1.5, min_points=6)
 
