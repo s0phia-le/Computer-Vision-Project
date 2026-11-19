@@ -247,8 +247,12 @@ def main(
         pcd = remove_high_points(pcd)
 
         # background subtraction
+        if frame_number == 0:
+            queue.append(pcd)
         if frame_number < 10:
             queue.append(pcd)
+            base_pcd = queue[0]
+            pcd = background_subtraction(base_pcd, pcd, 0.003)
         else:
             queue.append(pcd)
             base_pcd = queue.popleft()
