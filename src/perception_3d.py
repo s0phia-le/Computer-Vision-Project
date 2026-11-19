@@ -246,23 +246,31 @@ def main(
         pcd = remove_high_points(pcd)
 
         # background subtraction
-        if frame_number < 10:
+        dist_threshold = 0.003
+        if frame_number <= 2:
             queue.append(pcd)
+        elif frame_number < 10:
+            print("HERE:", frame_number)
+            queue.append(pcd)
+            base_pcd = queue[0]
+            pcd = background_subtraction(base_pcd, pcd, dist_threshold)
         else:
             queue.append(pcd)
             base_pcd = queue.popleft()
-            pcd = background_subtraction(base_pcd, pcd, 0.003)
+            pcd = background_subtraction(base_pcd, pcd, dist_threshold)
 
-        # clustering (DBSCAN + centroid calculation)
-        clustering(pcd, eps=1.5, min_points=6)
+        if frame_number > 2:
+            print("HERE2:", frame_number)
+            # clustering (DBSCAN + centroid calculation)
+            clustering(pcd, eps=1.5, min_points=6)
 
-        # motion estimation
-        next_vehicle_id = estimate_motion(vehicles, previous_vehicles, next_vehicle_id, max_match_distance=2.0, frame_dt=1.0)
+            # motion estimation
+            next_vehicle_id = estimate_motion(vehicles, previous_vehicles, next_vehicle_id, max_match_distance=2.0, frame_dt=1.0)
 
-        # Write list of vehicles as a CSV
-        write_csv_helper(output_path / f"{frame_number}.csv", vehicles)
+            # Write list of vehicles as a CSV
+            write_csv_helper(output_path / f"{frame_number}.csv", vehicles)
 
-        previous_vehicles = vehicles
+            previous_vehicles = vehicles
 
 
 if __name__ == "__main__":
