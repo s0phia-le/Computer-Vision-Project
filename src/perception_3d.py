@@ -200,14 +200,15 @@ def clustering(pcd: o3d.geometry.PointCloud, eps, min_points):
         labels = np.array(pcd.cluster_dbscan(eps, min_points, print_progress=True))
 
     # 3. Analyze clusters
-    max_label = labels.max()
-    print(f"Point cloud has {max_label + 1} clusters (excluding noise)")
-    
-    # visualize clusies 
-    colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
-    colors[labels < 0] = 0  # Black/zero for noise
-    pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
-    o3d.visualization.draw_geometries([pcd])
+    if len(labels) != 0:
+        max_label = labels.max()
+        print(f"Point cloud has {max_label + 1} clusters (excluding noise)")
+        
+        # visualize clusies 
+        colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
+        colors[labels < 0] = 0  # Black/zero for noise
+        pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
+        o3d.visualization.draw_geometries([pcd])
 
 def main(
     data_path: Path,
