@@ -115,13 +115,13 @@ def background_subtraction(base_pcd: o3d.geometry.PointCloud, pcd: o3d.geometry.
     non_static_pcd.paint_uniform_color([0, 0, 1.0])
     static_pcd.paint_uniform_color([1.0, 0, 0])
 
-    o3d.visualization.draw_geometries(
-        [non_static_pcd, static_pcd],
-        zoom=0.8,
-        front=[-0.4999, -0.1659, -0.8499],
-        lookat=[2.1813, 2.0619, 2.0999],
-        up=[0.1204, -0.9852, 0.1215]
-    )
+    # o3d.visualization.draw_geometries(
+    #     [non_static_pcd, static_pcd],
+    #     zoom=0.8,
+    #     front=[-0.4999, -0.1659, -0.8499],
+    #     lookat=[2.1813, 2.0619, 2.0999],
+    #     up=[0.1204, -0.9852, 0.1215]
+    # )
 
     return non_static_pcd
 
@@ -245,7 +245,7 @@ def clustering(pcd: o3d.geometry.PointCloud, vehicles, eps, min_points):
             )
 
         # visualize the point cloud along with all cluster bounding boxes
-        o3d.visualization.draw_geometries([pcd, *bounding_boxes])
+        # o3d.visualization.draw_geometries([pcd, *bounding_boxes])
             
         # # visualize clusies 
         # colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
@@ -305,7 +305,7 @@ def main(
 
         if frame_number > 2:
             # clustering (DBSCAN + centroid calculation)
-            clustering(pcd, vehicles, eps=2, min_points=5)
+            clustering(pcd, vehicles, eps=2, min_points=2)
 
             # motion estimation
             next_vehicle_id = estimate_motion(vehicles, previous_vehicles, next_vehicle_id, max_match_distance=2.0, frame_dt=1.0)

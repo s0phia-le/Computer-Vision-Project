@@ -23,8 +23,8 @@ elif len(list(args.pred_dir.glob("*.csv"))) == 0:
     exit(1)
 
 # %%
-start_index = gt["Frame"].min()
-end_index = gt["Frame"].max()
+start_index = int(gt["Frame"].min())
+end_index = int(gt["Frame"].max())
 
 
 # %% Helpers
