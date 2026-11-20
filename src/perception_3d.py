@@ -60,13 +60,17 @@ def ground_removal(pcd: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
     """segment point cloud to remove plane"""
 
     # finds plane with largest support in the point cloud
-    plane_model, inliers = pcd.segment_plane(distance_threshold=0.5,
+    plane_model, inliers = pcd.segment_plane(distance_threshold=0.5, #0.01, tweak
                                          ransac_n=3,
-                                         num_iterations=1000)
+                                         num_iterations=1000) #400, lower slightly
 
     inlier_cloud = pcd.select_by_index(inliers)
     outlier_cloud = pcd.select_by_index(inliers, invert=True)
     inlier_cloud.paint_uniform_color([1.0, 0, 0])
+    
+    # finding road points - inliers
+    # want to pick points if near road then they are cars with mask
+    
     # o3d.visualization.draw_geometries(
     #     [inlier_cloud, outlier_cloud],
     #     zoom=0.8,
@@ -141,6 +145,7 @@ def estimate_motion(
     max_match_distance: float = 2.0,
     frame_dt: float = 1.0
 ) -> int:
+    # min movmenet less than 0.01 then static object 
     """Estimate vehicle motion by matching current vehicles to previous vehicles
     based on proximity of their positions.
     """
@@ -303,7 +308,7 @@ def main(
 
         pcd = load_point_cloud(data_path / f"{frame_number}.pcd")
 
-        pcd = preprocess_point_cloud(pcd, voxel_size=0.10)
+        pcd = preprocess_point_cloud(pcd, voxel_size=0.10) # use 1 or 0.8, 0.9
 
         # ground removal (RANSAC)
         pcd = ground_removal(pcd)
@@ -312,7 +317,7 @@ def main(
         pcd = remove_high_points(pcd)
 
         # background subtraction
-        dist_threshold = 0.003
+        dist_threshold = 0.003 #higher 0.01
         if frame_number <= 2:
             queue.append(pcd)
         elif frame_number < 10:
@@ -326,7 +331,7 @@ def main(
 
         if frame_number > 2:
             # clustering (DBSCAN + centroid calculation)
-            clustering(pcd, vehicles, eps=2, min_points=2)
+            clustering(pcd, vehicles, eps=2, min_points=2) #eps=1.8 minpoints=3
 
             # motion estimation
             next_vehicle_id = estimate_motion(vehicles, previous_vehicles, next_vehicle_id, max_match_distance=2.0, frame_dt=1.0)
