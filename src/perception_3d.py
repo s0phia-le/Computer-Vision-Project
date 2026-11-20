@@ -60,7 +60,7 @@ def ground_removal(pcd: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
     """segment point cloud to remove plane"""
 
     # finds plane with largest support in the point cloud
-    plane_model, inliers = pcd.segment_plane(distance_threshold=0.5, #0.01, tweak
+    plane_model, inliers = pcd.segment_plane(distance_threshold=0.01, #0.05, tweak
                                          ransac_n=3,
                                          num_iterations=1000) #400, lower slightly
 
@@ -221,15 +221,15 @@ def clustering(pcd: o3d.geometry.PointCloud, vehicles, eps, min_points):
     
     # run the DBSCAN clustering
     with o3d.utility.VerbosityContextManager(
-    o3d.utility.VerbosityLevel.Debug
+    o3d.utility.VerbosityLevel.Error
     ) as cm:
-        labels = np.array(pcd.cluster_dbscan(eps, min_points, print_progress=True))
+        labels = np.array(pcd.cluster_dbscan(eps, min_points, print_progress=False))
         
 
     # Analyze clusters
     if len(labels) != 0:
         max_label = labels.max()
-        print(f"Point cloud has {max_label + 1} clusters (excluding noise)")
+        # print(f"Point cloud has {max_label + 1} clusters (excluding noise)")
         
         bounding_boxes = []
 
@@ -288,6 +288,7 @@ def main(
     # YOU MAY ADD OTHER ARGUMENTS HERE.
     # IF YOU DO, SUPPLY GOOD DEFAULTS BOTH HERE AND IN THE ARGUMENT PARSER.
 ):
+
     if end_index < 0:
         end_index = len(list(data_path.glob("*.pcd"))) + end_index
 
