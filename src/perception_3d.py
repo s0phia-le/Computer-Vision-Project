@@ -191,9 +191,9 @@ def estimate_motion(
         curr.vehicle_id = prev.vehicle_id
 
         # Calculate motion vector (position difference)
-        curr.mvec_x = (curr.position_x - prev.position_x) / frame_dt
-        curr.mvec_y = (curr.position_y - prev.position_y) / frame_dt
-        curr.mvec_z = (curr.position_z - prev.position_z) / frame_dt
+        curr.mvec_x = curr.position_x - prev.position_x
+        curr.mvec_y = curr.position_y - prev.position_y
+        curr.mvec_z = curr.position_z - prev.position_z
 
         matched_curr.add(curr_idx)
         matched_prev.add(prev_idx)
