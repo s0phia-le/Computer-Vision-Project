@@ -134,9 +134,18 @@ def visualize_cloud(pcd: o3d.geometry.PointCloud):
                                         lookat=[2.1813, 2.0619, 2.0999],
                                         up=[0.1204, -0.9852, 0.1215])
 
-def estimate_motion(curr_vehicles: list[Vehicle], prev_vehicles: list[Vehicle], next_vehicle_id: int, max_match_distance: float = 2.0, frame_dt: float = 1.0) -> int:
-    """Estimate motion of vehicles by matching current vehicles to previous vehicles based on proximity."""
-    # first frame: assign IDs but velocity unknown
+def estimate_motion(
+    curr_vehicles: list[Vehicle],
+    prev_vehicles: list[Vehicle],
+    next_vehicle_id: int,
+    max_match_distance: float = 2.0,
+    frame_dt: float = 1.0
+) -> int:
+    """Estimate vehicle motion by matching current vehicles to previous vehicles
+    based on proximity of their positions.
+    """
+
+    # First frame: assign new IDs since there are no previous vehicles
     if not prev_vehicles:
         for v in curr_vehicles:
             v.vehicle_id = next_vehicle_id
@@ -144,50 +153,62 @@ def estimate_motion(curr_vehicles: list[Vehicle], prev_vehicles: list[Vehicle], 
 
         return next_vehicle_id
 
-    # calc dist between every current and previous vehicle
+    # Calculate distances between current and previous vehicles
     distances = []
+
     for curr_idx, curr in enumerate(curr_vehicles):
         for prev_idx, prev in enumerate(prev_vehicles):
+
             dx = curr.position_x - prev.position_x
             dy = curr.position_y - prev.position_y
             dz = curr.position_z - prev.position_z
 
             dist = np.sqrt(dx**2 + dy**2 + dz**2)
+
             distances.append((dist, curr_idx, prev_idx))
 
-    # closest pairs
+    # Sort distances from smallest to largest
     distances.sort(key=lambda x: x[0])
+
     matched_curr = set()
     matched_prev = set()
 
-    # match vehicle
+    # Match vehicles based on closest distance
     for dist, curr_idx, prev_idx in distances:
+
+        # Ignore matches that are too far away
         if dist > max_match_distance:
             break
+
+        # Ensure each vehicle is matched only once
         if curr_idx in matched_curr or prev_idx in matched_prev:
             continue
 
         curr = curr_vehicles[curr_idx]
         prev = prev_vehicles[prev_idx]
 
-        # assign ID and calculate velocity
+        # Reuse previous vehicle ID
         curr.vehicle_id = prev.vehicle_id
-        curr.mvec_x = curr.position_x - prev.position_x 
+
+        # Calculate motion vector (position difference)
+        curr.mvec_x = curr.position_x - prev.position_x
         curr.mvec_y = curr.position_y - prev.position_y
         curr.mvec_z = curr.position_z - prev.position_z
 
         matched_curr.add(curr_idx)
         matched_prev.add(prev_idx)
 
-        # assign ids to unmatched vehicles
-        for curr_idx, v in enumerate(curr_vehicles):
-            if curr_idx not in matched_curr:
-                v.vehicle_id = next_vehicle_id
-                next_vehicle_id += 1
+    # Assign new IDs to vehicles that could not be matched
+    for curr_idx, curr in enumerate(curr_vehicles):
 
-                v.mvec_x = 0.0
-                v.mvec_y = 0.0
-                v.mvec_z = 0.0
+        if curr_idx not in matched_curr:
+            curr.vehicle_id = next_vehicle_id
+            next_vehicle_id += 1
+
+            curr.mvec_x = 0.0
+            curr.mvec_y = 0.0
+            curr.mvec_z = 0.0
+
     return next_vehicle_id
 
 def clustering(pcd: o3d.geometry.PointCloud, vehicles, eps, min_points):
