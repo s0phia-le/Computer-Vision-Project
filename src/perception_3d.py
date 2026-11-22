@@ -56,8 +56,6 @@ def write_csv_helper(file: Path, vehicles: Iterable[Vehicle]):
         file: the path to the CSV file
         vehicles: the list of vehicles
     """
-    # Start with header by inspecting field names of the Vehicle class; if the list of vehicles is
-    # empty then we need a new default Vehicle for the header:
     with open(file, "w") as f:
         f.write(Vehicle.csv_header() + "\n")
         for v in vehicles:
