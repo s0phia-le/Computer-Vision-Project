@@ -1,3 +1,14 @@
+"""
+Intro to Computer Vision (CSCI-431) Final Project.
+
+This project involves detecting and finding motion vectors for cars from 3D LiDAR point cloud data
+frames. This is done through the use of multiple pre-processing steps (voxel downsampling, ground 
+removal with RANSAC, background subtraction, etc.) and clustering algorithms (DBSCAN) for car position
+estimation. Using these estimates, motion vectors for cars can be produced.
+
+Authors: Natalie Zesch, Sydney Tsin, Nicole Orlik, Sophia Le
+"""
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -51,13 +62,28 @@ def load_point_cloud(path_to_cloud: Path) -> o3d.geometry.PointCloud:
 
 # preprocessing point cloud data
 def preprocess_point_cloud(pcd: o3d.geometry.PointCloud, voxel_size: float = 0.10) -> o3d.geometry.PointCloud:
-    """preprocess the point cloud by downsampling and removing outliers."""
+    """
+    Preprocess the point cloud by voxel downsampling.
+    
+    Args:
+        pcd: the point cloud
+        voxel_size: the size of the voxels to use in voxel downsampling
+    Returns:
+        the voxel downsampled point cloud
+    """
     pcd = pcd.remove_non_finite_points(remove_nan=True, remove_infinite=True)
     pcd = pcd.voxel_down_sample(voxel_size)
     return pcd
 
 def ground_removal(pcd: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
-    """segment point cloud to remove plane"""
+    """
+    Use DBSCAN to detect and remove the ground plane from the given point cloud.
+
+    Args:
+        pcd: the point cloud
+    Returns:
+        the point cloud after ground removal
+    """
 
     # finds plane with largest support in the point cloud
     plane_model, inliers = pcd.segment_plane(distance_threshold=0.01, #0.05, tweak
@@ -65,40 +91,27 @@ def ground_removal(pcd: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
                                          num_iterations=1000) #400, lower slightly
 
     inlier_cloud = pcd.select_by_index(inliers)
-    outlier_cloud = pcd.select_by_index(inliers, invert=True)
     inlier_cloud.paint_uniform_color([1.0, 0, 0])
-    
-    # finding road points - inliers
-    # want to pick points if near road then they are cars with mask
-    
-    # o3d.visualization.draw_geometries(
-    #     [inlier_cloud, outlier_cloud],
-    #     zoom=0.8,
-    #     front=[-0.4999, -0.1659, -0.8499],
-    #     lookat=[2.1813, 2.0619, 2.0999],
-    #     up=[0.1204, -0.9852, 0.1215]
-    # )
     
     # select all points excluding inliers (the ground)
     return pcd.select_by_index(inliers, invert=True)
 
 
 def remove_high_points(pcd: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
+    """
+    Removes points above car height from the given point cloud.
+
+    Args:
+        pcd: the point cloud
+    Returns:
+        the point cloud with removed points above car height
+    """
+    
     points = np.asarray(pcd.points)
     max_height = 2.3
     high_indices = np.where(points[:, 2] > max_height)[0]
     
     low_pcd = pcd.select_by_index(high_indices, invert=True)
-
-    # high_pcd = pcd.select_by_index(high_indices)
-    # high_pcd.paint_uniform_color([1.0, 0, 0])
-    # o3d.visualization.draw_geometries(
-    #     [high_pcd, low_pcd],
-    #     zoom=0.8,
-    #     front=[-0.4999, -0.1659, -0.8499],
-    #     lookat=[2.1813, 2.0619, 2.0999],
-    #     up=[0.1204, -0.9852, 0.1215]
-    # )
 
     return low_pcd
 
@@ -107,6 +120,13 @@ def background_subtraction(base_pcd: o3d.geometry.PointCloud, pcd: o3d.geometry.
     """
     Using a base point cloud, perform background subtraction on the current point cloud and remove
     stationary objects.
+
+    Args:
+        base_pcd: the base pcd to use as a reference
+        pcd: the current point cloud
+        dist_thresh: the distance threshold; a distance between points higher than this is considered "non-static"
+    Returns:
+        the point cloud after background subtraction
     """
 
     dists = pcd.compute_point_cloud_distance(base_pcd)
@@ -119,19 +139,16 @@ def background_subtraction(base_pcd: o3d.geometry.PointCloud, pcd: o3d.geometry.
     non_static_pcd.paint_uniform_color([0, 0, 1.0])
     static_pcd.paint_uniform_color([1.0, 0, 0])
 
-    # o3d.visualization.draw_geometries(
-    #     [non_static_pcd, static_pcd],
-    #     zoom=0.8,
-    #     front=[-0.4999, -0.1659, -0.8499],
-    #     lookat=[2.1813, 2.0619, 2.0999],
-    #     up=[0.1204, -0.9852, 0.1215]
-    # )
-
     return non_static_pcd
 
 
 def visualize_cloud(pcd: o3d.geometry.PointCloud):
-    """visualizes a given point cloud"""
+    """
+    visualizes a given point cloud.
+    
+    Args:
+        pcd: the point cloud
+    """
     o3d.visualization.draw_geometries([pcd],
                                         zoom=0.8,
                                         front=[-0.4999, -0.1659, -0.8499],
@@ -145,8 +162,8 @@ def estimate_motion(
     max_match_distance: float = 2.0,
     frame_dt: float = 1.0
 ) -> int:
-    # min movmenet less than 0.01 then static object 
-    """Estimate vehicle motion by matching current vehicles to previous vehicles
+    """
+    Estimate vehicle motion by matching current vehicles to previous vehicles
     based on proximity of their positions.
     """
 
