@@ -49,6 +49,13 @@ class Vehicle:
 
 
 def write_csv_helper(file: Path, vehicles: Iterable[Vehicle]):
+    """
+    Writes the list of vehicles to a CSV at the given location.
+
+    Args:
+        file: the path to the CSV file
+        vehicles: the list of vehicles
+    """
     # Start with header by inspecting field names of the Vehicle class; if the list of vehicles is
     # empty then we need a new default Vehicle for the header:
     with open(file, "w") as f:
@@ -71,6 +78,7 @@ def preprocess_point_cloud(pcd: o3d.geometry.PointCloud, voxel_size: float = 0.1
     Returns:
         the voxel downsampled point cloud
     """
+
     pcd = pcd.remove_non_finite_points(remove_nan=True, remove_infinite=True)
     pcd = pcd.voxel_down_sample(voxel_size)
     return pcd
@@ -160,11 +168,19 @@ def estimate_motion(
     prev_vehicles: list[Vehicle],
     next_vehicle_id: int,
     max_match_distance: float = 2.0,
-    frame_dt: float = 1.0
 ) -> int:
     """
     Estimate vehicle motion by matching current vehicles to previous vehicles
     based on proximity of their positions.
+
+    Args:
+        curr_vehicles: the list of vehicles identified in the current frame
+        prev_vehicles: the list of vehicles identified in the previous frame
+        next_vehicle_id: the next available vehicle id
+        max_match_distance: the maximum distance between matched cars where they will still be considered
+        the same car
+    Returns:
+        the next available vehicle id
     """
 
     # First frame: assign new IDs since there are no previous vehicles
@@ -234,7 +250,16 @@ def estimate_motion(
     return next_vehicle_id
 
 def clustering(pcd: o3d.geometry.PointCloud, vehicles, eps, min_points):
-    """cluster the point cloud using DBSCAN"""
+    """
+    Clusters the point cloud using DBSCAN, finds centroids for each cluster,
+    and adds bounding boxes around clusters.
+    
+    Args:
+        pcd: the point cloud
+        vehicles: the list of vehicles to add clusters to
+        eps: density parameter used to find neighbouring points for DBSCAN
+        min_points: the minimum number of points needed to form a cluster for DBSCAN
+    """
     
     # run the DBSCAN clustering
     with o3d.utility.VerbosityContextManager(
@@ -246,8 +271,6 @@ def clustering(pcd: o3d.geometry.PointCloud, vehicles, eps, min_points):
     # Analyze clusters
     if len(labels) != 0:
         max_label = labels.max()
-        # print(f"Point cloud has {max_label + 1} clusters (excluding noise)")
-        
         bounding_boxes = []
 
         for i in range(max_label + 1):
@@ -260,8 +283,6 @@ def clustering(pcd: o3d.geometry.PointCloud, vehicles, eps, min_points):
             # get centroid 
             x, y, z = cluster_pcd.get_center()
             
-            # print(f"Centroid center: x={x}, y={y}, z={z}")
-            
             # get the Axis-Aligned Bounding Box (AABB)
             aabb = cluster_pcd.get_axis_aligned_bounding_box()
             aabb.color = (1, 0, 0) 
@@ -270,7 +291,6 @@ def clustering(pcd: o3d.geometry.PointCloud, vehicles, eps, min_points):
             # access raw min/max coordinate arrays if needed
             min_bound = aabb.get_min_bound()
             max_bound = aabb.get_max_bound()
-            # print(f"Cluster {i} | Min: {min_bound} | Max: {max_bound}")
             
             # add the vehicle
             vehicles.append(Vehicle(
@@ -285,16 +305,7 @@ def clustering(pcd: o3d.geometry.PointCloud, vehicles, eps, min_points):
                 bbox_z_max= max_bound[2],
                 bbox_z_min= min_bound[2]
                 )
-            )
-
-        # visualize the point cloud along with all cluster bounding boxes
-        # o3d.visualization.draw_geometries([pcd, *bounding_boxes])
-            
-        # # visualize clusies 
-        # colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
-        # colors[labels < 0] = 0  # Black/zero for noise
-        # pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
-        # o3d.visualization.draw_geometries([pcd])          
+            )    
         
 
 def main(
@@ -302,10 +313,16 @@ def main(
     output_path: Path = "perception_results",
     start_index: int = 0,
     end_index: int = -1,
-    # YOU MAY ADD OTHER ARGUMENTS HERE.
-    # IF YOU DO, SUPPLY GOOD DEFAULTS BOTH HERE AND IN THE ARGUMENT PARSER.
 ):
+    """
+    Entry point.
 
+    Args:
+        data_path: path to the point cloud data
+        output_path: path to the results folder location
+        start_index: the frame to begin processing on
+        end_index: the frame to end processing on
+    """
     if end_index < 0:
         end_index = len(list(data_path.glob("*.pcd"))) + end_index
 
@@ -320,13 +337,7 @@ def main(
         # Loading point cloud
         pcd = load_point_cloud(data_path / f"{frame_number}.pcd")
 
-        # YOUR CODE HERE: do whatever to populate the list of vehicles for this frame. You may use
-        # any functions available in open3d for background subtraction, road surface detection,
-        # clustering, etc.
-
-        pcd = load_point_cloud(data_path / f"{frame_number}.pcd")
-
-        pcd = preprocess_point_cloud(pcd, voxel_size=0.10) # use 1 or 0.8, 0.9
+        pcd = preprocess_point_cloud(pcd, voxel_size=0.10)
 
         # ground removal (RANSAC)
         pcd = ground_removal(pcd)
@@ -335,7 +346,7 @@ def main(
         pcd = remove_high_points(pcd)
 
         # background subtraction
-        dist_threshold = 0.003 #higher 0.01
+        dist_threshold = 0.003
         if frame_number <= 2:
             queue.append(pcd)
         elif frame_number < 10:
@@ -349,10 +360,10 @@ def main(
 
         if frame_number > 2:
             # clustering (DBSCAN + centroid calculation)
-            clustering(pcd, vehicles, eps=2, min_points=2) #eps=1.8 minpoints=3
+            clustering(pcd, vehicles, eps=2, min_points=2)
 
             # motion estimation
-            next_vehicle_id = estimate_motion(vehicles, previous_vehicles, next_vehicle_id, max_match_distance=2.0, frame_dt=1.0)
+            next_vehicle_id = estimate_motion(vehicles, previous_vehicles, next_vehicle_id, max_match_distance=2.0)
 
             # Write list of vehicles as a CSV
             write_csv_helper(output_path / f"{frame_number}.csv", vehicles)
